@@ -1,0 +1,158 @@
+services:
+  home-assistant:
+    depends_on:
+      postgres:
+        condition: service_healthy
+      influxdb:
+        condition: service_healthy
+      mosquitto:
+        condition: service_healthy
+    container_name: home-assistant
+    image: homeassistant/home-assistant:2024.8.0
+    restart: unless-stopped
+    networks:
+      home-assistant:
+        aliases:
+          - home-assistant.home
+    ports:
+      - 8123:8123
+    user: "${UID}:${GID}"
+    volumes:
+      - ./home-assistant/config:/config
+    environment:
+      - TZ=${TZ}
+      - DB_CONNECTION=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres.home:5432/${POSTGRES_DB}
+      - INFLUXDB_ORG=${INFLUXDB_ORG}
+      - INFLUXDB_BUCKET=${INFLUXDB_BUCKET}
+      - INFLUXDB_TOKEN=${INFLUXDB_ADMIN_TOKEN}
+
+  postgres:
+    container_name: home-assistant-pg
+    image: postgres:16.3-alpine
+    restart: unless-stopped
+    networks:
+      home-assistant:
+        aliases:
+          - postgres.home
+    ports:
+      - 5432:5432
+    healthcheck:
+      test: pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}
+      interval: 20s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+      start_interval: 2s
+    user: "${UID}:${GID}"
+    volumes:
+      - ./postgres/data:/var/lib/postgresql/data
+    environment:
+      - TZ=${TZ}
+      - PGTZ=${PGTZ}
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+
+  influxdb:
+    container_name: home-assistant-influx
+    image: influxdb:2.7-alpine
+    restart: unless-stopped
+    networks:
+      home-assistant:
+        aliases:
+          - influxdb.home
+    ports:
+      - 8086:8086
+    healthcheck:
+      test: influx ping
+      interval: 20s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+      start_interval: 2s
+    user: "${UID}:${GID}"
+    volumes:
+      - ./influxdb/data:/var/lib/influxdb2
+      # - ./influxdb/config:/etc/influxdb2
+    environment:
+      - INFLUXD_LOG_LEVEL=error
+      - DOCKER_INFLUXDB_INIT_MODE=setup
+      - DOCKER_INFLUXDB_INIT_USERNAME=${INFLUXDB_USERNAME}
+      - DOCKER_INFLUXDB_INIT_PASSWORD=${INFLUXDB_PASSWORD}
+      - DOCKER_INFLUXDB_INIT_ORG=${INFLUXDB_ORG}
+      - DOCKER_INFLUXDB_INIT_BUCKET=${INFLUXDB_BUCKET}
+      - DOCKER_INFLUXDB_INIT_RETENTION=52w
+      - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=${INFLUXDB_ADMIN_TOKEN}
+
+  mosquitto:
+    container_name: home-assistant-mqtt
+    image: eclipse-mosquitto:2.0.18
+    restart: unless-stopped
+    networks:
+      home-assistant:
+        aliases:
+          - mosquitto.home
+    ports:
+      - 1883:1883
+    healthcheck:
+      test: mosquitto_sub -p 1883 -C 1 -E -W 3 -i 'probe' -t 'ping'
+      interval: 20s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+      start_interval: 2s
+    user: "${UID}:${GID}"
+    volumes:
+      - ./mosquitto/config:/mosquitto/config
+      - ./mosquitto/data:/mosquitto/data
+    environment:
+      - TZ=${TZ}
+
+  zigbee2mqtt:
+    depends_on:
+      mosquitto:
+        condition: service_healthy
+    container_name: home-assistant-z2mqtt
+    image: koenkk/zigbee2mqtt:1.39.1
+    restart: unless-stopped
+    networks:
+      home-assistant:
+        aliases:
+          - zigbee2mqtt.home
+    ports:
+      - 8080:8080
+    user: "${UID}:${GID}"
+    group_add:
+      - dialout
+    volumes:
+      - ./zigbee2mqtt/data:/app/data
+    environment:
+      - TZ=${TZ}
+    devices:
+      - ${ZIGBEE_USB_PATH}:/dev/ttyACM0
+
+  caddy:
+    depends_on:
+      - home-assistant
+    container_name: home-assistant-caddy
+    image: caddy:2.8.4-alpine
+    restart: unless-stopped
+    networks:
+      - home-assistant-external
+      - home-assistant
+    ports:
+      - 80:80
+      - 443:443
+    user: "${UID}:${GID}"
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile
+      - ./caddy/data:/data
+      - ./caddy/config:/config
+
+networks:
+  home-assistant:
+    name: home-assistant
+    internal: true
+  home-assistant-external:
+    name: home-assistant-external
+    driver: bridge

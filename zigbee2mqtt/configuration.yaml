@@ -1,0 +1,36 @@
+# Home Assistant integration (MQTT discovery)
+homeassistant: true
+
+frontend: true
+
+# Allow new devices to join
+permit_join: false
+
+# MQTT settings
+mqtt:
+  server: 'mqtt://mosquitto.home:1883'
+  base_topic: zigbee2mqtt
+
+  # MQTT server authentication
+  # user: my_user
+  # password: my_password
+
+  # Disable self-signed SSL certificates
+  reject_unauthorized: true
+
+serial:
+  port: /dev/ttyACM0
+  adapter: ember
+
+advanced:
+  network_key: GENERATE
+  pan_id: GENERATE
+  ext_pan_id: GENERATE
+  homeassistant_legacy_entity_attributes: false
+  legacy_api: false
+  legacy_availability_payload: false
+  channel: 15
+  log_level: warning
+
+device_options:
+  legacy: false
