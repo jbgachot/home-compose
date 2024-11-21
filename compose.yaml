@@ -8,9 +8,10 @@ services:
       mosquitto:
         condition: service_healthy
     container_name: home-assistant
-    image: homeassistant/home-assistant:2024.8.0
+    image: homeassistant/home-assistant:2024.11.2
     restart: unless-stopped
     networks:
+      home-assistant-external:
       home-assistant:
         aliases:
           - home-assistant.home
@@ -28,7 +29,7 @@ services:
 
   postgres:
     container_name: home-assistant-pg
-    image: postgres:16.3-alpine
+    image: postgres:17.1-alpine
     restart: unless-stopped
     networks:
       home-assistant:
@@ -86,7 +87,7 @@ services:
 
   mosquitto:
     container_name: home-assistant-mqtt
-    image: eclipse-mosquitto:2.0.18
+    image: eclipse-mosquitto:2.0.20
     restart: unless-stopped
     networks:
       home-assistant:
@@ -113,9 +114,10 @@ services:
       mosquitto:
         condition: service_healthy
     container_name: home-assistant-z2mqtt
-    image: koenkk/zigbee2mqtt:1.39.1
+    image: koenkk/zigbee2mqtt:1.41.0
     restart: unless-stopped
     networks:
+      home-assistant-external:
       home-assistant:
         aliases:
           - zigbee2mqtt.home
